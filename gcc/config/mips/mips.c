@@ -591,6 +591,7 @@ const struct mips_cpu_info mips_cpu_info_table[] = {
 
   /* MIPS II */
   { "r6000", PROCESSOR_R6000, 2 },
+  { "allegrex", PROCESSOR_ALLEGREX, 2 },
 
   /* MIPS III */
   { "r4000", PROCESSOR_R4000, 3 },
@@ -631,6 +632,10 @@ const struct mips_cpu_info mips_cpu_info_table[] = {
 #define MIPS_MARCH_CONTROLS_SOFT_FLOAT 0
 #endif
 
+static void mips_init_builtins		PARAMS ((void));
+static rtx mips_expand_builtin		PARAMS ((tree, rtx, rtx,
+						 enum machine_mode, int));
+
 /* Initialize the GCC target structure.  */
 #undef TARGET_ASM_ALIGNED_HI_OP
 #define TARGET_ASM_ALIGNED_HI_OP "\t.half\t"
@@ -663,6 +668,11 @@ const struct mips_cpu_info mips_cpu_info_table[] = {
 #define TARGET_SCHED_ISSUE_RATE mips_issue_rate
 #undef TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE
 #define TARGET_SCHED_USE_DFA_PIPELINE_INTERFACE mips_use_dfa_pipeline_interface
+
+#undef TARGET_INIT_BUILTINS
+#define TARGET_INIT_BUILTINS mips_init_builtins
+#undef TARGET_EXPAND_BUILTIN
+#define TARGET_EXPAND_BUILTIN mips_expand_builtin
 
 #undef TARGET_ENCODE_SECTION_INFO
 #define TARGET_ENCODE_SECTION_INFO mips_encode_section_info
@@ -10913,3 +10923,162 @@ iris6_asm_file_end (stream)
 #endif /* TARGET_IRIX6 */
 
 #include "gt-mips.h"
+
+
+/* Allegrex builtins (__builtin_allegrex_*), as provided by the original
+   ALLEGREX port and, later, pspdev's GCC 4.0.2 patch.  */
+
+enum allegrex_builtin
+{
+  ALLEGREX_BUILTIN_CLZ,
+  ALLEGREX_BUILTIN_CLO,
+  ALLEGREX_BUILTIN_WSBH,
+  ALLEGREX_BUILTIN_WSBW,
+  ALLEGREX_BUILTIN_BITREV,
+  ALLEGREX_BUILTIN_MIN,
+  ALLEGREX_BUILTIN_MAX,
+  ALLEGREX_BUILTIN_SYNC,
+  ALLEGREX_BUILTIN_CACHE,
+  ALLEGREX_BUILTIN_MAX_CODE
+};
+
+static void
+mips_init_builtins ()
+{
+  tree si_si, si_si_si, void_void, void_si_si;
+
+  if (!TARGET_ALLEGREX)
+    return;
+
+  si_si = build_function_type (integer_type_node,
+				tree_cons (NULL_TREE, integer_type_node,
+					   void_list_node));
+  si_si_si = build_function_type (integer_type_node,
+				   tree_cons (NULL_TREE, integer_type_node,
+					      tree_cons (NULL_TREE,
+							 integer_type_node,
+							 void_list_node)));
+  void_void = build_function_type (void_type_node, void_list_node);
+  void_si_si = build_function_type (void_type_node,
+				     tree_cons (NULL_TREE, integer_type_node,
+						tree_cons (NULL_TREE,
+							   integer_type_node,
+							   void_list_node)));
+
+  builtin_function ("__builtin_allegrex_clz", si_si, ALLEGREX_BUILTIN_CLZ,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_clo", si_si, ALLEGREX_BUILTIN_CLO,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_wsbh", si_si, ALLEGREX_BUILTIN_WSBH,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_wsbw", si_si, ALLEGREX_BUILTIN_WSBW,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_bitrev", si_si, ALLEGREX_BUILTIN_BITREV,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_min", si_si_si, ALLEGREX_BUILTIN_MIN,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_max", si_si_si, ALLEGREX_BUILTIN_MAX,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_sync", void_void, ALLEGREX_BUILTIN_SYNC,
+		    BUILT_IN_MD, NULL, NULL_TREE);
+  builtin_function ("__builtin_allegrex_cache", void_si_si,
+		    ALLEGREX_BUILTIN_CACHE, BUILT_IN_MD, NULL, NULL_TREE);
+}
+
+static rtx
+mips_expand_builtin (exp, target, subtarget, mode, ignore)
+     tree exp;
+     rtx target;
+     rtx subtarget ATTRIBUTE_UNUSED;
+     enum machine_mode mode ATTRIBUTE_UNUSED;
+     int ignore ATTRIBUTE_UNUSED;
+{
+  tree fndecl = TREE_OPERAND (TREE_OPERAND (exp, 0), 0);
+  tree arglist = TREE_OPERAND (exp, 1);
+  int fcode = DECL_FUNCTION_CODE (fndecl);
+  rtx op0 = NULL_RTX, op1 = NULL_RTX;
+
+  if (arglist)
+    {
+      op0 = expand_expr (TREE_VALUE (arglist), NULL_RTX, SImode, 0);
+      if (TREE_CHAIN (arglist))
+	op1 = expand_expr (TREE_VALUE (TREE_CHAIN (arglist)), NULL_RTX,
+			   SImode, 0);
+    }
+
+  if (fcode == ALLEGREX_BUILTIN_SYNC)
+    {
+      emit_insn (gen_allegrex_sync ());
+      return NULL_RTX;
+    }
+  if (fcode == ALLEGREX_BUILTIN_CACHE)
+    {
+      if (GET_CODE (op0) != CONST_INT)
+	{
+	  error ("the first argument of __builtin_allegrex_cache must be a constant");
+	  return NULL_RTX;
+	}
+      emit_insn (gen_allegrex_cache (op0, force_reg (SImode, op1)));
+      return NULL_RTX;
+    }
+
+  if (target == 0 || GET_MODE (target) != SImode
+      || !register_operand (target, SImode))
+    target = gen_reg_rtx (SImode);
+  op0 = force_reg (SImode, op0);
+  if (op1)
+    op1 = force_reg (SImode, op1);
+
+  switch (fcode)
+    {
+    case ALLEGREX_BUILTIN_CLZ:
+      emit_insn (gen_allegrex_clz (target, op0));
+      break;
+    case ALLEGREX_BUILTIN_CLO:
+      emit_insn (gen_allegrex_clo (target, op0));
+      break;
+    case ALLEGREX_BUILTIN_WSBH:
+      emit_insn (gen_allegrex_wsbh (target, op0));
+      break;
+    case ALLEGREX_BUILTIN_WSBW:
+      emit_insn (gen_allegrex_wsbw (target, op0));
+      break;
+    case ALLEGREX_BUILTIN_BITREV:
+      emit_insn (gen_allegrex_bitrev (target, op0));
+      break;
+    case ALLEGREX_BUILTIN_MIN:
+      emit_insn (gen_sminsi3 (target, op0, op1));
+      break;
+    case ALLEGREX_BUILTIN_MAX:
+      emit_insn (gen_smaxsi3 (target, op0, op1));
+      break;
+    default:
+      abort ();
+    }
+  return target;
+}
+
+/* True if an ext or ins of SIZE bits at POSITION of register OP can be
+   done with one Allegrex instruction.  */
+
+int
+mips_use_ins_ext_p (op, size, position)
+     rtx op, size, position;
+{
+  HOST_WIDE_INT len, pos;
+
+  if (!ISA_HAS_EXT_INS
+      || !register_operand (op, VOIDmode)
+      || GET_MODE_BITSIZE (GET_MODE (op)) > BITS_PER_WORD
+      || GET_CODE (size) != CONST_INT || GET_CODE (position) != CONST_INT)
+    return 0;
+
+  len = INTVAL (size);
+  pos = INTVAL (position);
+
+  if (len <= 0 || len >= GET_MODE_BITSIZE (GET_MODE (op))
+      || pos < 0 || pos + len > GET_MODE_BITSIZE (GET_MODE (op)))
+    return 0;
+
+  return 1;
+}

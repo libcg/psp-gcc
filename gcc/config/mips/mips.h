@@ -76,7 +76,8 @@ enum processor_type {
   PROCESSOR_R5KC,
   PROCESSOR_R20KC,
   PROCESSOR_SR71000,
-  PROCESSOR_SB1
+  PROCESSOR_SB1,
+  PROCESSOR_ALLEGREX
 };
 
 /* Recast the cpu class to be the cpu attribute.  */
@@ -365,6 +366,7 @@ extern void		sbss_section PARAMS ((void));
 #define TARGET_MIPS5500             (mips_arch == PROCESSOR_R5500)
 #define TARGET_SB1                  (mips_arch == PROCESSOR_SB1)
 #define TARGET_SR71K                (mips_arch == PROCESSOR_SR71000)
+#define TARGET_ALLEGREX             (mips_arch == PROCESSOR_ALLEGREX)
 
 /* Scheduling target defines.  */
 #define TUNE_MIPS3000               (mips_tune == PROCESSOR_R3000)
@@ -376,6 +378,7 @@ extern void		sbss_section PARAMS ((void));
 #define TUNE_MIPS6000               (mips_tune == PROCESSOR_R6000)
 #define TUNE_SB1                    (mips_tune == PROCESSOR_SB1)
 #define TUNE_SR71K                  (mips_tune == PROCESSOR_SR71000)
+#define TUNE_ALLEGREX               (mips_tune == PROCESSOR_ALLEGREX)
 
 /* Define preprocessor macros for the -march and -mtune options.
    PREFIX is either _MIPS_ARCH or _MIPS_TUNE, INFO is the selected
@@ -811,7 +814,7 @@ extern void		sbss_section PARAMS ((void));
 				 && !TARGET_MIPS16)
 
 /* ISA has just the integer condition move instructions (movn,movz) */
-#define ISA_HAS_INT_CONDMOVE     0
+#define ISA_HAS_INT_CONDMOVE     (TARGET_ALLEGREX)
 
 /* ISA has the mips4 FP condition code instructions: FP-compare to CC,
    branch on CC, and move (both FP and non-FP) on CC.  */
@@ -844,6 +847,7 @@ extern void		sbss_section PARAMS ((void));
 /* ISA has count leading zeroes/ones instruction (not implemented).  */
 #define ISA_HAS_CLZ_CLO         ((ISA_MIPS32				\
                                   || ISA_MIPS64				\
+                                  || TARGET_ALLEGREX			\
                                  ) && !TARGET_MIPS16)
 
 /* ISA has double-word count leading zeroes/ones instruction (not
@@ -880,6 +884,7 @@ extern void		sbss_section PARAMS ((void));
 
 /* ISA has 32-bit rotate right instruction.  */
 #define ISA_HAS_ROTR_SI         (TARGET_MIPS5400                        \
+                                 || TARGET_ALLEGREX                     \
                                  || TARGET_MIPS5500                     \
                                  || TARGET_SR71K                        \
                                  )
@@ -897,6 +902,12 @@ extern void		sbss_section PARAMS ((void));
 				  || ISA_MIPS32				\
 				  || ISA_MIPS64)	       		\
 				 && !TARGET_MIPS16)
+
+/* ISA has the ext and ins bit field instructions (Allegrex; later MIPS32r2).  */
+#define ISA_HAS_EXT_INS         (TARGET_ALLEGREX && !TARGET_MIPS16)
+
+/* ISA has the min and max instructions (Allegrex).  */
+#define ISA_HAS_MIN_MAX         (TARGET_ALLEGREX && !TARGET_MIPS16)
 
 /* True if trunc.w.s and trunc.w.d are real (not synthetic)
    instructions.  Both require TARGET_HARD_FLOAT, and trunc.w.d

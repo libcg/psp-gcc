@@ -47,7 +47,16 @@
    (UNSPEC_CONSTTABLE_DF	17)
    (UNSPEC_ALIGN_2		18)
    (UNSPEC_ALIGN_4		19)
-   (UNSPEC_ALIGN_8		20)])
+   (UNSPEC_ALIGN_8		20)
+
+   ;; Allegrex
+   (UNSPEC_CLZ			400)
+   (UNSPEC_CLO			401)
+   (UNSPEC_WSBH			402)
+   (UNSPEC_WSBW			403)
+   (UNSPEC_BITREV		404)
+   (UNSPEC_SYNC			405)
+   (UNSPEC_CACHE		406)])
 
 
 ;; ....................
@@ -125,7 +134,7 @@
 
 ;; ??? Fix everything that tests this attribute.
 (define_attr "cpu"
-  "default,r3000,r3900,r6000,r4000,r4100,r4111,r4120,r4300,r4600,r4650,r5000,r5400,r5500,r8000,sr71000,r4kc,r5kc,r20kc"
+  "default,r3000,r3900,r6000,r4000,r4100,r4111,r4120,r4300,r4600,r4650,r5000,r5400,r5500,r8000,sr71000,r4kc,r5kc,r20kc,sb1,allegrex"
   (const (symbol_ref "mips_cpu_attr")))
 
 ;; Does the instruction have a mandatory delay slot?
@@ -4897,12 +4906,21 @@ move\\t%0,%z4\\n\\
 ;; Only specify the mode operand 1, the rest are assumed to be word_mode.
 (define_expand "extzv"
   [(set (match_operand 0 "register_operand" "")
-	(zero_extract (match_operand:QI 1 "memory_operand" "")
+	(zero_extract (match_operand 1 "nonimmediate_operand" "")
 		      (match_operand 2 "immediate_operand" "")
 		      (match_operand 3 "immediate_operand" "")))]
   "!TARGET_MIPS16"
   "
 {
+  if (mips_use_ins_ext_p (operands[1], operands[2], operands[3]))
+    {
+      emit_insn (gen_extzvsi_allegrex (operands[0], operands[1], operands[2],
+				       operands[3]));
+      DONE;
+    }
+  if (GET_CODE (operands[1]) != MEM)
+    FAIL;
+
   /* If the field does not start on a byte boundary, then fail.  */
   if (INTVAL (operands[3]) % 8 != 0)
     FAIL;
@@ -4945,13 +4963,22 @@ move\\t%0,%z4\\n\\
 
 ;; Only specify the mode operands 0, the rest are assumed to be word_mode.
 (define_expand "insv"
-  [(set (zero_extract (match_operand:QI 0 "memory_operand" "")
+  [(set (zero_extract (match_operand 0 "nonimmediate_operand" "")
 		      (match_operand 1 "immediate_operand" "")
 		      (match_operand 2 "immediate_operand" ""))
-	(match_operand 3 "register_operand" ""))]
+	(match_operand 3 "reg_or_0_operand" ""))]
   "!TARGET_MIPS16"
   "
 {
+  if (mips_use_ins_ext_p (operands[0], operands[1], operands[2]))
+    {
+      emit_insn (gen_insvsi_allegrex (operands[0], operands[1], operands[2],
+				      operands[3]));
+      DONE;
+    }
+  if (GET_CODE (operands[0]) != MEM || !register_operand (operands[3], VOIDmode))
+    FAIL;
+
   /* If the field does not start on a byte boundary, then fail.  */
   if (INTVAL (operands[2]) % 8 != 0)
     FAIL;
@@ -7741,6 +7768,10 @@ move\\t%0,%z4\\n\\
 {
   if (TARGET_SR71K && GET_CODE (operands[2]) != CONST_INT)
     return \"rorv\\t%0,%1,%2\";
+
+  if (TARGET_ALLEGREX)
+    return GET_CODE (operands[2]) == CONST_INT
+	   ? \"rotr\\t%0,%1,%2\" : \"rotrv\\t%0,%1,%2\";
 
   if ((GET_CODE (operands[2]) == CONST_INT)
       && (INTVAL (operands[2]) < 0 || INTVAL (operands[2]) >= 32))
@@ -11198,3 +11229,101 @@ ld\\t%2,%1-%S1(%2)\;daddu\\t%2,%2,$31\\n\\t%*j\\t%2"
   [(set_attr "type"	"arith")
    (set_attr "mode"	"DI")
    (set_attr "length"	"40")])
+
+
+;; Allegrex instructions (as in pspdev's allegrex.md for GCC 4.0.2,
+;; written for the GCC 3.3 MIPS port).
+
+(define_insn "extzvsi_allegrex"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(zero_extract:SI (match_operand:SI 1 "register_operand" "d")
+			 (match_operand:SI 2 "immediate_operand" "I")
+			 (match_operand:SI 3 "immediate_operand" "I")))]
+  "mips_use_ins_ext_p (operands[1], operands[2], operands[3])"
+  "ext\t%0,%1,%3,%2"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "insvsi_allegrex"
+  [(set (zero_extract:SI (match_operand:SI 0 "register_operand" "+d")
+			 (match_operand:SI 1 "immediate_operand" "I")
+			 (match_operand:SI 2 "immediate_operand" "I"))
+	(match_operand:SI 3 "reg_or_0_operand" "dJ"))]
+  "mips_use_ins_ext_p (operands[0], operands[1], operands[2])"
+  "ins\t%0,%z3,%2,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "sminsi3"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(smin:SI (match_operand:SI 1 "register_operand" "d")
+		 (match_operand:SI 2 "register_operand" "d")))]
+  "ISA_HAS_MIN_MAX"
+  "min\t%0,%1,%2"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "smaxsi3"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(smax:SI (match_operand:SI 1 "register_operand" "d")
+		 (match_operand:SI 2 "register_operand" "d")))]
+  "ISA_HAS_MIN_MAX"
+  "max\t%0,%1,%2"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "allegrex_clz"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(unspec:SI [(match_operand:SI 1 "register_operand" "d")] UNSPEC_CLZ))]
+  "TARGET_ALLEGREX"
+  "clz\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "allegrex_clo"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(unspec:SI [(match_operand:SI 1 "register_operand" "d")] UNSPEC_CLO))]
+  "TARGET_ALLEGREX"
+  "clo\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "allegrex_wsbh"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(unspec:SI [(match_operand:SI 1 "register_operand" "d")] UNSPEC_WSBH))]
+  "TARGET_ALLEGREX"
+  "wsbh\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "allegrex_wsbw"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(unspec:SI [(match_operand:SI 1 "register_operand" "d")] UNSPEC_WSBW))]
+  "TARGET_ALLEGREX"
+  "wsbw\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "allegrex_bitrev"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(unspec:SI [(match_operand:SI 1 "register_operand" "d")] UNSPEC_BITREV))]
+  "TARGET_ALLEGREX"
+  "bitrev\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "allegrex_sync"
+  [(unspec_volatile [(const_int 0)] UNSPEC_SYNC)]
+  "TARGET_ALLEGREX"
+  "sync"
+  [(set_attr "type"	"unknown")
+   (set_attr "mode"	"none")])
+
+(define_insn "allegrex_cache"
+  [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "")
+		     (match_operand:SI 1 "register_operand" "d")]
+		    UNSPEC_CACHE)]
+  "TARGET_ALLEGREX"
+  "cache\t%0,0(%1)"
+  [(set_attr "type"	"unknown")
+   (set_attr "mode"	"none")])

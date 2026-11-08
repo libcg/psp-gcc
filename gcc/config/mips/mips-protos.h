@@ -170,4 +170,8 @@ extern rtx		gen_int_relational PARAMS ((enum rtx_code, rtx, rtx,
 extern void		gen_conditional_branch PARAMS ((rtx *, enum rtx_code));
 #endif
 
+#ifdef RTX_CODE
+extern int mips_use_ins_ext_p PARAMS ((rtx, rtx, rtx));
+#endif
+
 #endif /* ! GCC_MIPS_PROTOS_H */
