@@ -4451,6 +4451,33 @@ move\\t%0,%z4\\n\\
    (set_attr "mode"	"DI")
    (set_attr "length"	"4,8")])
 
+;; Allegrex seh/seb: sign extension of a register in one instruction.
+;; 6.60 firmware: 3131 seh in 54 modules, 1543 seb in 119 modules, while adjacent
+;; sll/sra 16|24 pairs occur only 185 times in 17 modules (118 of them in the pops_*g copies).
+(define_insn "*extendhisi2_seh"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(sign_extend:SI (match_operand:HI 1 "register_operand" "d")))]
+  "TARGET_ALLEGREX"
+  "seh\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "*extendqihi2_seb"
+  [(set (match_operand:HI 0 "register_operand" "=d")
+	(sign_extend:HI (match_operand:QI 1 "register_operand" "d")))]
+  "TARGET_ALLEGREX"
+  "seb\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
+(define_insn "*extendqisi2_seb"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(sign_extend:SI (match_operand:QI 1 "register_operand" "d")))]
+  "TARGET_ALLEGREX"
+  "seb\t%0,%1"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])
+
 (define_expand "extendhisi2"
   [(set (match_operand:SI 0 "register_operand" "")
 	(sign_extend:SI (match_operand:HI 1 "nonimmediate_operand" "")))]
@@ -4459,6 +4486,14 @@ move\\t%0,%z4\\n\\
 {
   if (optimize && GET_CODE (operands[1]) == MEM)
     operands[1] = force_not_mem (operands[1]);
+
+  /* Allegrex: register sign extension is a single seh.  */
+  if (TARGET_ALLEGREX && GET_CODE (operands[1]) != MEM)
+    {
+      emit_insn (gen_rtx_SET (VOIDmode, operands[0],
+			      gen_rtx_SIGN_EXTEND (SImode, operands[1])));
+      DONE;
+    }
 
   if (GET_CODE (operands[1]) != MEM)
     {
@@ -4489,6 +4524,14 @@ move\\t%0,%z4\\n\\
 {
   if (optimize && GET_CODE (operands[1]) == MEM)
     operands[1] = force_not_mem (operands[1]);
+
+  /* Allegrex: register sign extension is a single seb.  */
+  if (TARGET_ALLEGREX && GET_CODE (operands[1]) != MEM)
+    {
+      emit_insn (gen_rtx_SET (VOIDmode, operands[0],
+			      gen_rtx_SIGN_EXTEND (HImode, operands[1])));
+      DONE;
+    }
 
   if (GET_CODE (operands[1]) != MEM)
     {
@@ -4521,6 +4564,14 @@ move\\t%0,%z4\\n\\
 {
   if (optimize && GET_CODE (operands[1]) == MEM)
     operands[1] = force_not_mem (operands[1]);
+
+  /* Allegrex: register sign extension is a single seb.  */
+  if (TARGET_ALLEGREX && GET_CODE (operands[1]) != MEM)
+    {
+      emit_insn (gen_rtx_SET (VOIDmode, operands[0],
+			      gen_rtx_SIGN_EXTEND (SImode, operands[1])));
+      DONE;
+    }
 
   if (GET_CODE (operands[1]) != MEM)
     {
