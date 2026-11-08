@@ -4444,10 +4444,19 @@ do {									\
    Instead, we use ASM_OUTPUT_CASE_LABEL to switch back to the .text
    section if appropriate.  */
 #undef ASM_OUTPUT_CASE_LABEL
+/* Allegrex: the PSP modules have their jump tables in .data, in function
+   output order between the variables of the same file (threadman 6.60: all
+   strings first, then the UID function tables and the jump tables
+   interleaved; ported from the GCC 4.0.2 recreation).  */
 #define ASM_OUTPUT_CASE_LABEL(FILE, PREFIX, NUM, INSN)			\
 do {									\
   if (TARGET_EMBEDDED_PIC || TARGET_MIPS16)				\
     function_section (current_function_decl);				\
+  else if (TARGET_ALLEGREX)						\
+    {									\
+      data_section ();							\
+      ASM_OUTPUT_ALIGN (FILE, 2);					\
+    }									\
   ASM_OUTPUT_INTERNAL_LABEL (FILE, PREFIX, NUM);			\
 } while (0)
 
