@@ -5798,6 +5798,17 @@ expand_compound_operation (x)
 	return x;
 
       len = INTVAL (XEXP (x, 1));
+
+#ifdef COMBINE_KEEP_HIGH_EXTRACT
+      /* Allegrex: keep an unsigned extract that reaches the top bit
+	 (one ext) instead of rewriting it as a logical shift.  */
+      if (COMBINE_KEEP_HIGH_EXTRACT && unsignedp
+	  && GET_MODE (x) == SImode
+	  && GET_CODE (XEXP (x, 0)) == REG
+	  && GET_MODE (XEXP (x, 0)) == SImode
+	  && len + INTVAL (XEXP (x, 2)) == GET_MODE_BITSIZE (SImode))
+	return x;
+#endif
       pos = INTVAL (XEXP (x, 2));
 
       /* If this goes outside the object being extracted, replace the object
@@ -8040,6 +8051,7 @@ simplify_and_const_int (x, mode, varop, constop)
      unsigned HOST_WIDE_INT constop;
 {
   unsigned HOST_WIDE_INT nonzero;
+  unsigned HOST_WIDE_INT orig_constop = constop;
   int i;
 
   /* Simplify VAROP knowing that we will be only looking at some of the
@@ -8131,7 +8143,26 @@ simplify_and_const_int (x, mode, varop, constop)
 
   /* If we are only masking insignificant bits, return VAROP.  */
   if (constop == nonzero)
-    x = varop;
+    {
+#ifdef COMBINE_KEEP_HIGH_EXTRACT
+      /* Allegrex: an explicit AND of exactly the bits a logical right
+	 shift leaves is kept as one bit-field extract (ext).  */
+      if (COMBINE_KEEP_HIGH_EXTRACT
+	  && x != 0 && GET_CODE (x) == AND && mode == SImode
+	  && orig_constop == nonzero
+	  && GET_CODE (varop) == LSHIFTRT
+	  && GET_CODE (XEXP (varop, 0)) == REG
+	  && GET_CODE (XEXP (varop, 1)) == CONST_INT
+	  && INTVAL (XEXP (varop, 1)) > 0
+	  && INTVAL (XEXP (varop, 1)) < GET_MODE_BITSIZE (mode))
+	x = gen_rtx_ZERO_EXTRACT (mode, XEXP (varop, 0),
+				  GEN_INT (GET_MODE_BITSIZE (mode)
+					   - INTVAL (XEXP (varop, 1))),
+				  XEXP (varop, 1));
+      else
+#endif
+	x = varop;
+    }
   else
     {
       /* Otherwise, return an AND.  */

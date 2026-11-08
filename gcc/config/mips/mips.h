@@ -371,6 +371,11 @@ extern void		sbss_section PARAMS ((void));
 #define TARGET_SR71K                (mips_arch == PROCESSOR_SR71000)
 #define TARGET_ALLEGREX             (mips_arch == PROCESSOR_ALLEGREX)
 
+/* combine.c: keep (and (lshiftrt x C) (mask >> C)) as a zero_extract
+   (the original 6.60 firmware has ~1100 such ext with pos+size == 32 and never
+   a srl feeding a variable shift where the source masks the count).  */
+#define COMBINE_KEEP_HIGH_EXTRACT   (TARGET_ALLEGREX)
+
 /* Scheduling target defines.  */
 #define TUNE_MIPS3000               (mips_tune == PROCESSOR_R3000)
 #define TUNE_MIPS3900               (mips_tune == PROCESSOR_R3900)
