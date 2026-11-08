@@ -3339,6 +3339,14 @@ typedef struct mips_args {
 #define MOVE_MAX (TARGET_64BIT ? 8 : 4)
 #define MAX_MOVE_MAX 8
 
+/* Allegrex: a constant-size clear of at most two pieces is stored by pieces; clrstrsi (mips.md) would
+   otherwise leave the default CLEAR_RATIO at 2, so a 5..8-byte aligned clear became the store loop or a
+   memset call.  The 6.60 firmware stores those inline: sysmem _ReturnSegBlankList clears its 8-byte
+   segment with two sw $zero, and the 5-byte password buffers of mlnbridge_msapp/vshbridge_msapp
+   (sceMlnBridge_msapp_D527DEB0) are sw $zero + sb $zero; the smallest clear loop of the firmware is
+   0x14 bytes (5 words, threadman).  */
+#define CLEAR_RATIO 3
+
 /* Define this macro as a C expression which is nonzero if
    accessing less than a word of memory (i.e. a `char' or a
    `short') is no faster than accessing a word of memory, i.e., if

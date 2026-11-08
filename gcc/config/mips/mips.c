@@ -3777,6 +3777,48 @@ block_move_call (dest_reg, src_reg, bytes_rtx)
    operands[2] is the number of bytes to move.
    operands[3] is the alignment.  */
 
+/* Expand a clrstrsi: OPERANDS[0] is the BLKmode MEM to clear, OPERANDS[1] the length and OPERANDS[2]
+   the alignment in bytes.  A word-aligned block of constant size is cleared by a loop that steps a pointer
+   from DEST - SIZE up to DEST and stores at SIZE - 4 past the stepped pointer:
+
+	addiu	p,dest,-SIZE
+     1:	addiu	p,p,4
+	bne	p,dest,1b
+	sw	$0,SIZE-4(p)
+
+   so the end test compares against the destination register itself and needs no end pointer.  This is
+   the clear loop of the 6.60 kernel modules (74 sites in modulemgr, threadman, sysmem, iofilemgr and
+   loadcore, every word-aligned zero fill of them that is not an explicit count-down loop).  Return 0
+   (the caller then calls memset) for anything else.  */
+
+int
+mips_expand_clrstr (operands)
+     rtx operands[];
+{
+  rtx base, ptr, label, mem;
+  HOST_WIDE_INT size;
+
+  if (GET_CODE (operands[1]) != CONST_INT || GET_CODE (operands[2]) != CONST_INT
+      || INTVAL (operands[2]) < UNITS_PER_WORD)
+    return 0;
+  size = INTVAL (operands[1]);
+  if (size <= 0 || size % UNITS_PER_WORD != 0 || size > 0x7ff0)
+    return 0;
+
+  base = copy_addr_to_reg (XEXP (operands[0], 0));
+  ptr = gen_reg_rtx (Pmode);
+  label = gen_label_rtx ();
+  emit_insn (gen_addsi3 (ptr, base, GEN_INT (-size)));
+  emit_label (label);
+  emit_insn (gen_addsi3 (ptr, ptr, GEN_INT (UNITS_PER_WORD)));
+  mem = adjust_automodify_address (operands[0], SImode,
+				   plus_constant (ptr, size - UNITS_PER_WORD), 0);
+  set_mem_size (mem, GEN_INT (UNITS_PER_WORD));
+  emit_move_insn (mem, const0_rtx);
+  emit_cmp_and_jump_insns (ptr, base, NE, NULL_RTX, Pmode, 0, label);
+  return 1;
+}
+
 void
 expand_block_move (operands)
      rtx operands[];

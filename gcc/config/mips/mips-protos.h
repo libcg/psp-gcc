@@ -86,6 +86,7 @@ extern void		mips_va_start PARAMS ((tree, rtx));
 extern struct rtx_def  *mips_va_arg PARAMS ((tree, tree));
 
 extern void		expand_block_move PARAMS ((rtx *));
+extern int		mips_expand_clrstr PARAMS ((rtx *));
 extern void		final_prescan_insn PARAMS ((rtx, rtx *, int));
 extern void		init_cumulative_args PARAMS ((CUMULATIVE_ARGS *,
 						      tree, rtx));
