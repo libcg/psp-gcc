@@ -5531,6 +5531,19 @@ override_options ()
 void
 mips_conditional_register_usage ()
 {
+  /* Allegrex: the VFPU is coprocessor 2, so its registers are not fixed (they stay call-used, and no
+     SImode pseudo prefers COP2_REGS, so allocation is unchanged).  Effect: n_non_fixed_regs = 96 instead of
+     64, i.e. loop.c's movable threshold is 97 instead of 65.  Firmware evidence (6.60 kd modules): threadman
+     WaitEventFlag/SendMsgPipe/ReceiveMsgPipe/sub_00001580 hoists, loadcore doLinkLibraryEntries hoists 2,
+     audio audioMixerThread hoists buf+256, loadexec fixupArgsAddr constant order 32,4,8,128; no 6.60 site
+     contradicts it (a threshold 2 higher already hoists out of threadman sub_00001580's loop, which the original
+     does not).  */
+  if (TARGET_ALLEGREX)
+    {
+      int regno;
+      for (regno = COP2_REG_FIRST; regno <= COP2_REG_LAST; regno++)
+	fixed_regs[regno] = 0;
+    }
   if (!TARGET_HARD_FLOAT)
     {
       int regno;
