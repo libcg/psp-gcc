@@ -2857,6 +2857,10 @@
   DONE;
 }")
 
+;; Allegrex/PSP: the divide-by-zero trap is emitted as "break 0,7" (code in the low
+;; 10-bit field).  PSP firmware 6.60: 2452 compiler div traps encode (0,7) vs 94 (7,0)
+;; (the latter from assembler div macros and asm); 1.50: 691 vs 2.  Equivalent to the
+;; one-operand break encoding of the original assembler.
 (define_insn "div_trap_normal"
   [(trap_if (eq (match_operand 0 "register_operand" "d,d")
 		(match_operand 1 "true_reg_or_0_operand" "d,J"))
@@ -2881,16 +2885,16 @@
       if (GENERATE_BRANCHLIKELY)
 	{
           if (which_alternative == 1)
-	    return \"%(beql\\t%0,$0,1f\\n\\tbreak\\t%2\\n%~1:%)\";
+	    return \"%(beql\\t%0,$0,1f\\n\\tbreak\\t0,%2\\n%~1:%)\";
 	  else
-	    return \"%(beql\\t%0,%1,1f\\n\\tbreak\\t%2\\n%~1:%)\";
+	    return \"%(beql\\t%0,%1,1f\\n\\tbreak\\t0,%2\\n%~1:%)\";
 	}
       else
 	{
           if (which_alternative == 1)
-	    return \"%(bne\\t%0,$0,1f\\n\\tnop\\n\\tbreak\\t%2\\n%~1:%)\";
+	    return \"%(bne\\t%0,$0,1f\\n\\tnop\\n\\tbreak\\t0,%2\\n%~1:%)\";
 	  else
-	    return \"%(bne\\t%0,%1,1f\\n\\tnop\\n\\tbreak\\t%2\\n%~1:%)\";
+	    return \"%(bne\\t%0,%1,1f\\n\\tnop\\n\\tbreak\\t0,%2\\n%~1:%)\";
 	}
     }
   return \"\";
