@@ -2570,8 +2570,9 @@ extern enum reg_class mips_char_to_class[256];
    `current_function_outgoing_args_size'.  */
 #define OUTGOING_REG_PARM_STACK_SPACE
 
+/* PSP (Allegrex): EABI stack frames are 16-byte aligned.  */
 #define STACK_BOUNDARY \
-  ((mips_abi == ABI_32 || mips_abi == ABI_O64 || mips_abi == ABI_EABI) \
+  ((mips_abi == ABI_32 || mips_abi == ABI_O64) \
    ? 64 : 128)
 
 /* Make sure 4 words are always allocated on the stack.  */
@@ -2874,7 +2875,7 @@ typedef struct mips_args {
 /* Treat LOC as a byte offset from the stack pointer and round it up
    to the next fully-aligned offset.  */
 #define MIPS_STACK_ALIGN(LOC)						\
-  ((mips_abi == ABI_32 || mips_abi == ABI_O64 || mips_abi == ABI_EABI)	\
+  ((mips_abi == ABI_32 || mips_abi == ABI_O64)	\
    ? ((LOC) + 7) & ~7							\
    : ((LOC) + 15) & ~15)
 
