@@ -228,7 +228,27 @@
        (eq_attr "cpu" "r3000,r3900,r4600,r4650,r4100,r4120,r4300,r5000"))
   2 0)
 
-(define_function_unit "memory"   1 0 (eq_attr "type" "store") 1 0)
+(define_function_unit "memory"   1 0
+  (and (eq_attr "type" "store") (eq_attr "cpu" "!allegrex"))
+  1 0)
+
+;; Allegrex: a store keeps the data-memory port busy for two more cycles,
+;; so a load or store cannot issue in the two cycles after it (ported from
+;; the GCC 4.0.2 recreation, issue delay 2 -> 3 on firmware evidence: in 6.60
+;; one-restore epilogues right after a call, `move $v0, K' precedes
+;; `lw $ra' 570/692 times when `sw $ra' is the insn before the jal, and
+;; follows it 24/24 with one insn in between and 176/183 with more, i.e. the
+;; port is blocked exactly through the second cycle after the store).
+;; For the same reason a load that depends on the store (may alias it) is
+;; costed 3 cycles after it (ready delay 1 -> 3): threadman 6.60 starts its
+;; small $k1 functions with `sw $fp' before the `lui' of the global address
+;; chain (GetThreadId, GetUserLevel, ...), which needs the stores' priority
+;; through the dependent `lw' to be at least that of the lui chain; and the
+;; store -> next-load distance histogram d=1..4 is 319/44/63/1 in the original
+;; vs 333/35/60/1 with 3, 333/44/53/5 with 1, 332/39/56/3 with 2.
+(define_function_unit "memory"   1 0
+  (and (eq_attr "type" "store") (eq_attr "cpu" "allegrex"))
+  3 3)
 
 (define_function_unit "memory"   1 0 (eq_attr "type" "xfer") 2 0)
 
