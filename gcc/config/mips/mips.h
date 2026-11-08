@@ -3773,7 +3773,7 @@ typedef struct mips_args {
 /* ??? Fix this to be right for the R8000.  */
 #define BRANCH_COST							\
   ((! TARGET_MIPS16							\
-    && (TUNE_MIPS4000 || TUNE_MIPS6000))	\
+    && (TUNE_MIPS4000 || TUNE_MIPS6000 || TUNE_ALLEGREX))	\
    ? 2 : 1)
 
 /* If defined, modifies the length assigned to instruction INSN as a
