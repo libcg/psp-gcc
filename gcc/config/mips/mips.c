@@ -3719,6 +3719,53 @@ block_move_loop (dest_reg, src_reg, bytes, align, orig_dest, orig_src)
   emit_label (label);
 
   bytes_rtx = GEN_INT (MAX_MOVE_BYTES);
+  if (Pmode == SImode && align >= UNITS_PER_WORD)
+    {
+      /* Allegrex: a word-aligned block move loop copies MAX_MOVE_REGS words per iteration as separate
+	 loads and stores: all the loads, the first store, both pointer increments, then the remaining
+	 stores relative to the stepped destination, the last of which fills the delay slot of the loop
+	 branch:
+
+	 1:	lw	t0,0(src)
+		lw	t1,4(src)
+		lw	t2,8(src)
+		lw	t3,12(src)
+		sw	t0,0(dst)
+		addiu	src,src,16
+		addiu	dst,dst,16
+		sw	t1,-12(dst)
+		sw	t2,-8(dst)
+		bne	src,end,1b
+		sw	t3,-4(dst)
+
+	 This is the shape of every 16-byte copy loop in the 6.60 kernel modules (224 of 224 sites,
+	 tm-match survey/bmloop.py and bmloop2.py).  */
+      rtx regs[MAX_MOVE_REGS];
+      int i;
+
+      for (i = 0; i < MAX_MOVE_REGS; i++)
+	{
+	  regs[i] = gen_reg_rtx (SImode);
+	  emit_move_insn (regs[i],
+			  adjust_automodify_address (src_mem, SImode,
+						     plus_constant (src_reg, i * UNITS_PER_WORD),
+						     i * UNITS_PER_WORD));
+	}
+      emit_move_insn (adjust_automodify_address (dest_mem, SImode, dest_reg, 0), regs[0]);
+      emit_insn (gen_addsi3 (src_reg, src_reg, bytes_rtx));
+      emit_insn (gen_addsi3 (dest_reg, dest_reg, bytes_rtx));
+      for (i = 1; i < MAX_MOVE_REGS; i++)
+	emit_move_insn (adjust_automodify_address (dest_mem, SImode,
+						   plus_constant (dest_reg,
+								  (i - MAX_MOVE_REGS) * UNITS_PER_WORD),
+						   i * UNITS_PER_WORD),
+			regs[i]);
+      emit_insn (gen_cmpsi (src_reg, final_src));
+      emit_jump_insn (gen_bne (label));
+      if (leftover)
+	emit_insn (gen_movstrsi_internal (dest_mem, src_mem, GEN_INT (leftover), align_rtx));
+      return;
+    }
   emit_insn (gen_movstrsi_internal (dest_mem, src_mem, bytes_rtx, align_rtx));
 
   if (Pmode == DImode)
