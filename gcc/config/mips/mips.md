@@ -253,13 +253,36 @@
 (define_function_unit "memory"   1 0 (eq_attr "type" "xfer") 2 0)
 
 (define_function_unit "imuldiv"  1 0
-  (eq_attr "type" "hilo")
+  (and (eq_attr "type" "hilo") (eq_attr "cpu" "!allegrex"))
   1 3)
+
+;; Allegrex: mfhi/mflo do not hold the multiply unit, so a mult/multu (or
+;; madd) may issue in the cycle right after them.  In the 6.60 kd modules
+;; (pops excluded) `mfhi|mflo ; mult ; X' with X an ordinary non-branch,
+;; non-hi/lo insn occurs at 507 sites in 95 modules; with the generic 3-cycle
+;; reservation the scheduler would always have issued X first (our build of
+;; the uOFW kd sources: 0 such sites).  Example: the u64 overflow product in
+;; threadman's sceKernelCreateFpl (`mfhi; mflo; mult; addu').
+(define_function_unit "imuldiv"  1 0
+  (and (eq_attr "type" "hilo") (eq_attr "cpu" "allegrex"))
+  1 1)
 
 (define_function_unit "imuldiv"  1 0
   (and (eq_attr "type" "imul,imadd")
-       (eq_attr "cpu" "!r3000,r3900,r4000,r4600,r4650,r4100,r4120,r4300,r5000"))
+       (eq_attr "cpu" "!r3000,r3900,r4000,r4600,r4650,r4100,r4120,r4300,r5000,allegrex"))
   17 17)
+
+;; Allegrex: mult/multu (and madd) results are costed 5 cycles to mflo/mfhi.
+;; Measured against the 6.60 binaries: in sceSystimer's sceSTimerSetTMCY the
+;; original issues `mflo' after exactly four independent instructions and
+;; leaves the `move $a0' for the following call after the dependent `sw'; only
+;; a latency of 5 reproduces it (4 and 6 both differ, 17 hoists the move in
+;; front of the mflo).  Across the 6.60 kd modules the mult -> mflo distance
+;; peaks at 4 instructions between (927 of 4620 sites, 146 at 5) and is >= 6
+;; at only 329 sites, 260 of them in the seven near-identical pops modules.
+(define_function_unit "imuldiv"  1 0
+  (and (eq_attr "type" "imul,imadd") (eq_attr "cpu" "allegrex"))
+  5 5)
 
 ;; On them mips16, we want to stronly discourage a mult from appearing
 ;; after an mflo, since that requires explicit nop instructions.  We
