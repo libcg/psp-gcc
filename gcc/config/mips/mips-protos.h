@@ -172,6 +172,10 @@ extern void		gen_conditional_branch PARAMS ((rtx *, enum rtx_code));
 
 #ifdef RTX_CODE
 extern int mips_use_ins_ext_p PARAMS ((rtx, rtx, rtx));
+extern int and_operand PARAMS ((rtx, enum machine_mode));
+extern int allegrex_ins_mask_operand PARAMS ((rtx, enum machine_mode));
 #endif
+
+extern int mips_allegrex_ins_mask_p PARAMS ((HOST_WIDE_INT, int *, int *));
 
 #endif /* ! GCC_MIPS_PROTOS_H */

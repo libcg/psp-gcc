@@ -3549,10 +3549,30 @@ move\\t%0,%z4\\n\\
 (define_expand "andsi3"
   [(set (match_operand:SI 0 "register_operand" "=d,d")
 	(and:SI (match_operand:SI 1 "uns_arith_operand" "%d,d")
-		(match_operand:SI 2 "uns_arith_operand" "d,K")))]
+		(match_operand:SI 2 "and_operand" "d,K")))]
   ""
   "
 {
+  int pos, size;
+
+  /* Allegrex: x & ~(((1 << size) - 1) << pos) -> ins x,$0,pos,size
+     at expand time only for an in-place x &= MASK and for bit-field
+     stores.  Any other AND with an ins mask stays (and y MASK) until
+     *andsi3_allegrex_ins, so it is a single-set arm that ifcvt can turn
+     into ins+movz/movn and a movable loop invariant, as in the original code.  */
+  if (GET_CODE (operands[2]) == CONST_INT
+      && mips_allegrex_ins_mask_p (INTVAL (operands[2]), &pos, &size)
+      && (allegrex_bitfield_store_depth
+	  || rtx_equal_p (operands[0], operands[1])))
+    {
+      emit_move_insn (operands[0], force_reg (SImode, operands[1]));
+      emit_insn (gen_insvsi_allegrex (operands[0], GEN_INT (size),
+				      GEN_INT (pos), const0_rtx));
+      DONE;
+    }
+  if (GET_CODE (operands[2]) == CONST_INT
+      && !SMALL_INT_UNSIGNED (operands[2]))
+    operands[2] = force_reg (SImode, operands[2]);
   if (TARGET_MIPS16)
     {
       operands[1] = force_reg (SImode, operands[1]);
@@ -11327,3 +11347,21 @@ ld\\t%2,%1-%S1(%2)\;daddu\\t%2,%2,$31\\n\\t%*j\\t%2"
   "cache\t%0,0(%1)"
   [(set_attr "type"	"unknown")
    (set_attr "mode"	"none")])
+
+;; Allegrex: clear a contiguous bit field with "ins rd,$0,pos,size"
+;; (combine canonicalises the zero_extract store into this AND).
+(define_insn "*andsi3_allegrex_ins"
+  [(set (match_operand:SI 0 "register_operand" "=d")
+	(and:SI (match_operand:SI 1 "register_operand" "0")
+		(match_operand:SI 2 "allegrex_ins_mask_operand" "")))]
+  "TARGET_ALLEGREX && !TARGET_MIPS16"
+  "*
+{
+  int pos, size;
+  mips_allegrex_ins_mask_p (INTVAL (operands[2]), &pos, &size);
+  operands[3] = GEN_INT (pos);
+  operands[4] = GEN_INT (size);
+  return \"ins\\t%0,$0,%3,%4\";
+}"
+  [(set_attr "type"	"arith")
+   (set_attr "mode"	"SI")])

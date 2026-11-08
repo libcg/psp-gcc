@@ -701,8 +701,27 @@ store_bit_field (str_rtx, bitsize, bitnum, fieldmode, value, total_size)
 
    Note that protect_from_queue has already been done on OP0 and VALUE.  */
 
+/* Nonzero while a bit-field store is being expanded (the Allegrex andsi3
+   expander keeps its expand-time insv there).  */
+int allegrex_bitfield_store_depth;
+
+static void store_fixed_bit_field_1	PARAMS ((rtx, unsigned HOST_WIDE_INT,
+						 unsigned HOST_WIDE_INT,
+						 unsigned HOST_WIDE_INT, rtx));
+
 static void
 store_fixed_bit_field (op0, offset, bitsize, bitpos, value)
+     rtx op0;
+     unsigned HOST_WIDE_INT offset, bitsize, bitpos;
+     rtx value;
+{
+  allegrex_bitfield_store_depth++;
+  store_fixed_bit_field_1 (op0, offset, bitsize, bitpos, value);
+  allegrex_bitfield_store_depth--;
+}
+
+static void
+store_fixed_bit_field_1 (op0, offset, bitsize, bitpos, value)
      rtx op0;
      unsigned HOST_WIDE_INT offset, bitsize, bitpos;
      rtx value;

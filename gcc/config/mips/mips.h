@@ -149,6 +149,9 @@ extern int ignore_line_number;		/* != 0 if we are to ignore next .loc */
 extern int file_in_function_warning;	/* warning given about .file in func */
 extern int sdb_label_count;		/* block start/end next label # */
 extern int sdb_begin_function_line;     /* Starting Line of current function */
+/* Nonzero while expmed.c expands a bit-field store; read by the Allegrex
+   andsi3 expander.  */
+extern int allegrex_bitfield_store_depth;
 extern int mips_section_threshold;	/* # bytes of data/sdata cutoff */
 extern int g_switch_value;		/* value of the -G xx switch */
 extern int g_switch_set;		/* whether -G xx was passed.  */
@@ -3807,6 +3810,8 @@ typedef struct mips_args {
 
 #define PREDICATE_CODES							\
   {"uns_arith_operand",		{ REG, CONST_INT, SUBREG }},		\
+  {"and_operand",		{ REG, CONST_INT, SUBREG }},		\
+  {"allegrex_ins_mask_operand",	{ CONST_INT }},				\
   {"arith_operand",		{ REG, CONST_INT, SUBREG }},		\
   {"arith32_operand",		{ REG, CONST_INT, SUBREG }},		\
   {"reg_or_0_operand",		{ REG, CONST_INT, CONST_DOUBLE, SUBREG }}, \

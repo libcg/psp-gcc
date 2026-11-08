@@ -11082,3 +11082,47 @@ mips_use_ins_ext_p (op, size, position)
 
   return 1;
 }
+
+/* True if VALUE, as an SImode AND mask, clears exactly one contiguous run
+   of bits that does not fit andi; store the run in *POS and *SIZE.  */
+
+int
+mips_allegrex_ins_mask_p (value, pos, size)
+     HOST_WIDE_INT value;
+     int *pos, *size;
+{
+  unsigned HOST_WIDE_INT m = ~(unsigned HOST_WIDE_INT) value & 0xffffffff;
+  int lsb, n;
+
+  if (!TARGET_ALLEGREX || TARGET_MIPS16 || m == 0
+      || ((value & 0xffffffff) & ~(HOST_WIDE_INT) 0xffff) == 0)
+    return 0;
+  for (lsb = 0; !(m & 1); lsb++)
+    m >>= 1;
+  if (m & (m + 1))
+    return 0;
+  for (n = 0; m; n++)
+    m >>= 1;
+  if (pos)
+    *pos = lsb;
+  if (size)
+    *size = n;
+  return 1;
+}
+
+int
+allegrex_ins_mask_operand (op, mode)
+     rtx op;
+     enum machine_mode mode ATTRIBUTE_UNUSED;
+{
+  return (GET_CODE (op) == CONST_INT
+	  && mips_allegrex_ins_mask_p (INTVAL (op), NULL, NULL));
+}
+
+int
+and_operand (op, mode)
+     rtx op;
+     enum machine_mode mode;
+{
+  return uns_arith_operand (op, mode) || allegrex_ins_mask_operand (op, mode);
+}
