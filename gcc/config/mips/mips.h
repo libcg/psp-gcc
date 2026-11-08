@@ -1608,7 +1608,7 @@ do {							\
 #define STRUCTURE_SIZE_BOUNDARY 8
 
 /* There is no point aligning anything to a rounder boundary than this.  */
-#define BIGGEST_ALIGNMENT LONG_DOUBLE_TYPE_SIZE
+#define BIGGEST_ALIGNMENT (TARGET_ALLEGREX ? 128 : LONG_DOUBLE_TYPE_SIZE)
 
 /* Set this nonzero if move instructions will actually fail to work
    when given unaligned data.  */
